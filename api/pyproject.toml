@@ -7,6 +7,10 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
+name = "dify"
+version = "0.14.2"
+description = "Your project description"
+authors = ["guomou016 <guomou0016@163.com>"]
 package-mode = false
 
 ############################################################
