@@ -2,51 +2,41 @@ import threading
 from queue import Queue
 from typing import Any, Optional
 
-import dashscope  # type: ignore
-from dashscope import SpeechSynthesizer  # type: ignore
-from dashscope.api_entities.dashscope_response import SpeechSynthesisResponse  # type: ignore
-from dashscope.audio.tts import ResultCallback, SpeechSynthesisResult  # type: ignore
-
-from core.model_runtime.errors.invoke import InvokeBadRequestError
+import dashscope
+from dashscope.audio.tts_v2 import *
+from dashscope.audio.tts import SpeechSynthesizer as LegacySpeechSynthesizer
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.model_providers.__base.tts_model import TTSModel
 from core.model_runtime.model_providers.tongyi._common import _CommonTongyi
 
-
 class TongyiText2SpeechModel(_CommonTongyi, TTSModel):
     """
-    Model class for Tongyi Speech to text model.
+    Model class for Tongyi Speech-to-Text model.
     """
 
-    def _invoke(
-        self, model: str, tenant_id: str, credentials: dict, content_text: str, voice: str, user: Optional[str] = None
-    ) -> Any:
+    def _invoke(self, model: str, tenant_id: str, credentials: dict, content_text: str, voice: str, user: Optional[str] = None) -> Any:
         """
-        _invoke text2speech model
-
-        :param model: model name
-        :param tenant_id: user tenant id
-        :param credentials: model credentials
-        :param voice: model timbre
-        :param content_text: text content to be translated
-        :param user: unique user id
-        :return: text translated to audio file
+        Invoke text-to-speech model.
+        
+        :param model: Model name
+        :param tenant_id: User tenant ID
+        :param credentials: Model credentials
+        :param content_text: Text content to be converted
+        :param voice: Voice model
+        :param user: Unique user ID (optional)
+        :return: Audio file generated from text
         """
-        if not voice or voice not in [
-            d["value"] for d in self.get_tts_model_voices(model=model, credentials=credentials)
-        ]:
-            voice = self._get_model_default_voice(model, credentials)
-
-        return self._tts_invoke_streaming(model=model, credentials=credentials, content_text=content_text, voice=voice)
+        voice = voice or self._get_model_default_voice(model, credentials)
+        return self._tts_invoke_streaming(model, credentials, content_text, voice)
 
     def validate_credentials(self, model: str, credentials: dict, user: Optional[str] = None) -> None:
         """
-        validate credentials text2speech model
+        Validate the provided credentials.
 
-        :param model: model name
-        :param credentials: model credentials
-        :param user: unique user id
-        :return: text translated to audio file
+        :param model: Model name
+        :param credentials: Model credentials
+        :param user: Unique user ID (optional)
+        :raises CredentialsValidateFailedError: If validation fails
         """
         try:
             self._tts_invoke_streaming(
@@ -60,74 +50,84 @@ class TongyiText2SpeechModel(_CommonTongyi, TTSModel):
 
     def _tts_invoke_streaming(self, model: str, credentials: dict, content_text: str, voice: str) -> Any:
         """
-        _tts_invoke_streaming text2speech model
+        Perform text-to-speech conversion with streaming.
 
-        :param model: model name
-        :param credentials: model credentials
-        :param voice: model timbre
-        :param content_text: text content to be translated
-        :return: text translated to audio file
+        :param model: Model name
+        :param credentials: Model credentials
+        :param content_text: Text content to be converted
+        :param voice: Voice model
+        :return: Generator yielding audio data
         """
         word_limit = self._get_model_word_limit(model, credentials)
-        audio_type = self._get_model_audio_type(model, credentials)
-        try:
-            audio_queue: Queue = Queue()
-            callback = Callback(queue=audio_queue)
 
-            def invoke_remote(content, v, api_key, cb, at, wl):
-                if len(content) < word_limit:
-                    sentences = [content]
+        def invoke_remote(content, m, v, api_key, cb, audio_format, limit):
+            sentences = [content] if len(content) < limit else self._split_text_into_sentences(content, limit)
+            for sentence in sentences:
+                dashscope.api_key = api_key
+                if m == "cosyvoice-v1":
+                    SpeechSynthesizer(model=m, voice=v, callback=cb, format=audio_format).call(text=sentence.strip())
                 else:
-                    sentences = list(self._split_text_into_sentences(org_text=content, max_length=wl))
-                for sentence in sentences:
-                    SpeechSynthesizer.call(
+                    LegacySpeechSynthesizer.call(
                         model=v,
                         sample_rate=16000,
                         api_key=api_key,
                         text=sentence.strip(),
                         callback=cb,
-                        format=at,
+                        format=audio_format,
                         word_timestamp_enabled=True,
                         phoneme_timestamp_enabled=True,
                     )
 
-            threading.Thread(
-                target=invoke_remote,
-                args=(content_text, voice, credentials.get("dashscope_api_key"), callback, audio_type, word_limit),
-            ).start()
+        audio_queue = Queue()
+        callback = Callback(queue=audio_queue) if model == "cosyvoice-v1" else Callback_(queue=audio_queue)
+        audio_format = AudioFormat.MP3_16000HZ_MONO_128KBPS if model == "cosyvoice-v1" else 'mp3'
 
-            while True:
-                audio = audio_queue.get()
-                if audio is None:
-                    break
-                yield audio
+        threading.Thread(
+            target=invoke_remote,
+            args=(content_text, model, voice, credentials.get("dashscope_api_key"), callback, audio_format, word_limit),
+        ).start()
 
-        except Exception as ex:
-            raise InvokeBadRequestError(str(ex))
-
-    @staticmethod
-    def _process_sentence(sentence: str, credentials: dict, voice: str, audio_type: str):
-        """
-        _tts_invoke Tongyi text2speech model api
-
-        :param credentials: model credentials
-        :param sentence: text content to be translated
-        :param voice: model timbre
-        :param audio_type: audio file type
-        :return: text translated to audio file
-        """
-        response = dashscope.audio.tts.SpeechSynthesizer.call(
-            model=voice,
-            sample_rate=48000,
-            api_key=credentials.get("dashscope_api_key"),
-            text=sentence.strip(),
-            format=audio_type,
-        )
-        if isinstance(response.get_audio_data(), bytes):
-            return response.get_audio_data()
-
+        while True:
+            audio = audio_queue.get()
+            if audio is None:
+                break
+            yield audio
 
 class Callback(ResultCallback):
+    """
+    Callback class for handling speech synthesis events.
+    """
+
+    def __init__(self, queue: Queue):
+        self._queue = queue
+
+    def on_open(self):
+        print("Connection opened.")
+
+    def on_complete(self):
+        print("Speech synthesis complete.")
+        self._queue.put(None)
+        self._queue.task_done()
+
+    def on_error(self, message: str):
+        print(f"Error occurred: {message}")
+        self._queue.put(None)
+        self._queue.task_done()
+
+    def on_close(self):
+        print("Connection closed.")
+        self._queue.put(None)
+        self._queue.task_done()
+
+    def on_event(self, message: str):
+        print(f"Event received: {message}")
+
+    def on_data(self, data: bytes):
+        if data:
+            print(f"Received audio data: {len(data)} bytes.")
+            self._queue.put(data)
+
+class Callback_(dashscope.audio.tts.ResultCallback):
     def __init__(self, queue: Queue):
         self._queue = queue
 
@@ -138,7 +138,7 @@ class Callback(ResultCallback):
         self._queue.put(None)
         self._queue.task_done()
 
-    def on_error(self, response: SpeechSynthesisResponse):
+    def on_error(self, response: Any):
         self._queue.put(None)
         self._queue.task_done()
 
@@ -146,7 +146,7 @@ class Callback(ResultCallback):
         self._queue.put(None)
         self._queue.task_done()
 
-    def on_event(self, result: SpeechSynthesisResult):
-        ad = result.get_audio_frame()
-        if ad:
-            self._queue.put(ad)
+    def on_event(self, result: dashscope.audio.tts.SpeechSynthesisResult):
+        audio_frame = result.get_audio_frame()
+        if audio_frame:
+            self._queue.put(audio_frame)

@@ -1,0 +1,71 @@
+model: cosyvoice-v1
+model_type: tts
+model_properties:
+  default_voice: 'longxiaochun'
+  voices:
+    - mode: "longwan"
+      name: "龙婉 女(中文普通话)"
+      language: [ "zh-Hans" ]
+    - mode: "longcheng"
+      name: "龙橙 男(中文普通话)"
+      language: [ "zh-Hans" ]
+    - mode: "longhua"
+      name: "龙华 女童(中文普通话)"
+      language: [ "zh-Hans" ]
+    - mode: "longxiaochun"
+      name: "龙小淳 女(中英双语)"
+      language: [ "zh-Hans", "en-US" ]
+    - mode: "longxiaoxia"
+      name: "龙小夏 女(中文普通话)"
+      language: [ "zh-Hans" ]
+    - mode: "longxiaocheng"
+      name: "龙小诚 男(中英双语)"
+      language: [ "zh-Hans", "en-US" ]    
+    - mode: "longlaotie"
+      name: "龙老铁 男(东北口音)"
+      language: [ "zh-Hans" ]  
+    - mode: "longmiao"
+      name: "龙妙 女(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longjing"
+      name: "龙悦 女(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longxiaobai"
+      name: "龙小白 女(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longshu"
+      name: "龙书 男(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longyuan"
+      name: "龙媛 女(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longshuo"
+      name: "龙硕 男(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "loongbella"
+      name: "Bella2.0 女(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "loongstella"
+      name: "Stella2.0 女(中英双语)"
+      language: [ "zh-Hans", "en-US" ] 
+    - mode: "longfei"
+      name: "龙飞 男(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longjielidou"
+      name: "龙杰力豆 男童(中英双语)"
+      language: [ "zh-Hans", "en-US" ] 
+    - mode: "longtong"
+      name: "龙彤 女童(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longxiang"
+      name: "龙祥 男(中文普通话)"
+      language: [ "zh-Hans" ] 
+    - mode: "longjing"
+      name: "龙婧 女(中文普通话)"
+      language: [ "zh-Hans" ] 
+  word_limit: 7000                           
+pricing:
+  input: '1'
+  output: '0'
+  unit: '0.0001'
+  currency: RMB
