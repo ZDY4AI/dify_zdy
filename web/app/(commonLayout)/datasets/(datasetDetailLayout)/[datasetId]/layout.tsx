@@ -189,7 +189,7 @@ const DatasetDetailLayout: FC<IAppDetailLayoutProps> = (props) => {
 
   useEffect(() => {
     if (datasetRes)
-      document.title = `${datasetRes.name || 'Dataset'} - Dify`
+      document.title = `${datasetRes.name || 'Dataset'} - 智定义`
   }, [datasetRes])
 
   const setAppSiderbarExpand = useStore(state => state.setAppSiderbarExpand)
